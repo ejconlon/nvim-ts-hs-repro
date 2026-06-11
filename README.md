@@ -21,7 +21,7 @@ git submodule update --init --recursive
 
 ## Docker
 
-The Dockerfile runs the repro under `script(1)` so Neovim gets a pseudo-terminal:
+The Docker repro must run with an interactive TTY. `docker.sh` builds the image and runs `docker run --rm -it ...`:
 
 ```sh
 ./docker.sh
