@@ -40,6 +40,7 @@ The standalone config uses only:
 Run from this directory:
 
 ```sh
+./setup.sh
 ./repro.sh
 ```
 
