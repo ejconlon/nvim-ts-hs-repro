@@ -1,0 +1,5 @@
+build/
+xdg/
+*.log
+debug-*.log
+minimize.log

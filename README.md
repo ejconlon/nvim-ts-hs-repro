@@ -1,91 +1,54 @@
 # Neovim Haskell Tree-sitter Crash Repro
 
-Opening `Main.hs` with Haskell tree-sitter highlighting enabled causes Neovim to abort with:
+Opening `Main.hs` with Haskell tree-sitter highlighting enabled aborts Neovim:
 
 ```text
 corrupted size vs. prev_size
 SIGABRT, status 134
 ```
 
-## Confirmed
+## Reproduce
 
-- Reproduces with the main Neovim config after re-enabling the Haskell parser.
-- Reproduces with the standalone config in `init.lua`.
-- Does not require `lazy.nvim`.
-- Does not require `tree-sitter-manager.nvim`.
-- Does not require `haskell-tools.nvim` or HLS.
-- Does not require `rainbow-delimiters.nvim`.
-- The minimized trigger is in `Main.hs`.
-- The crash happens in an attached TUI while opening the file, before normal interaction is needed.
-
-## Triggering Syntax
-
-The minimized trigger is in `Main.hs`. It is an explicitly exported type plus multiple Haddock comments attached to constructors.
-
-Observed during reduction:
-
-- Removing the export list avoids the crash.
-- Exporting an unrelated name avoids the crash.
-- Removing the Haddock constructor comments avoids the crash.
-- A single short constructor Haddock comment was not enough to crash.
-- `deriving stock` is not required.
-
-## Minimal Repro
-
-The standalone config uses only:
-
-- the `tree-sitter-haskell` parser submodule
-- local Haskell query files under `queries/haskell/`
-- `vim.treesitter.start()` for Haskell buffers
-
-If this repository was cloned without submodules, initialize the parser first:
+Initialize the parser submodule, build the parser, then open the repro file:
 
 ```sh
 git submodule update --init --recursive
-```
-
-`setup.sh` builds the parser with `tree-sitter build`. This matters: building the same parser revision through the grammar's Makefile did not reproduce the crash in testing, while `tree-sitter build` did.
-
-Run from this directory:
-
-```sh
 ./setup.sh
 ./repro.sh
 ```
 
-Equivalent full command:
+`repro.sh` runs Neovim with `--clean`, isolated `XDG_*` paths, and the minimal config in `init.lua`.
+
+## Docker
+
+The Dockerfile runs the repro under `script(1)` so Neovim gets a pseudo-terminal:
 
 ```sh
-root=$(CDPATH= cd -- "$(dirname -- "./repro.sh")" && pwd)
-
-env \
-  XDG_CONFIG_HOME="$root/xdg/config" \
-  XDG_DATA_HOME="$root/xdg/data" \
-  XDG_STATE_HOME="$root/xdg/state" \
-  XDG_CACHE_HOME="$root/xdg/cache" \
-  nvim --clean -u "$root/init.lua" "$root/Main.hs"
+./docker.sh
 ```
 
-## Likely Cause
+Expected output includes `corrupted size vs. prev_size` and exit status 134.
 
-This points to a native Neovim/tree-sitter issue rather than a dotfiles issue.
+## Minimal Setup
 
-Most likely candidates:
+This repro uses only:
 
-- Neovim's built-in tree-sitter highlighter corrupting memory for this Haskell file/query case.
-- An interaction between the Haskell parser, Haskell highlight queries, and Neovim's highlighter.
+- `tree-sitter-haskell` as a git submodule
+- `tree-sitter build` to produce `build/parser/haskell.so`
+- local queries from `queries/haskell/`
+- `vim.treesitter.start()` for Haskell buffers
 
-Additional isolation findings:
+No plugin manager, LSP, HLS, or other Neovim plugins are involved.
 
-- Creating/parsing with the parser without starting the highlighter was stable once plugin auto-highlighting was disabled.
+## Trigger
+
+The minimized Haskell source is in `Main.hs`.
+
+The relevant shape is an explicitly exported type with Haddock comments attached to data constructors. Removing the export list or removing those constructor Haddock comments avoids the crash.
+
+## Notes
+
+- Building the parser with `tree-sitter build` reproduces the crash.
+- Building the same parser revision through the grammar Makefile did not reproduce it during testing.
+- Parser creation/parsing without starting tree-sitter highlighting was stable in earlier isolation.
 - Emptying both `highlights` and `injections` queries was stable.
-- The parser shared object must be built with `tree-sitter build` to reproduce this crash here.
-
-## Next Steps
-
-1. Test parser-only usage without starting the highlighter.
-2. Test `vim.treesitter.start()` with Haskell highlight queries removed or replaced.
-3. Test the Haskell parser with an external tree-sitter CLI if available.
-4. Try further reducing the comment lengths to find the smallest exact threshold.
-5. If parser-only is stable but highlighting crashes, report to Neovim with this minimal repro.
-6. If parser-only crashes, report against the Haskell tree-sitter parser first.
