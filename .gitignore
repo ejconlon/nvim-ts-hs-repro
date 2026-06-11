@@ -1,5 +1,5 @@
-/nvim-repro/cache
-/nvim-repro/data
-/nvim-repro/lazy
-/nvim-repro/state
+/build
+/nvim-repro
+/xdg
 /minimize.log
+debug-*.log

@@ -10,7 +10,9 @@ SIGABRT, status 134
 ## Confirmed
 
 - Reproduces with the main Neovim config after re-enabling the Haskell parser.
-- Reproduces with the standalone config in `nvim-repro/init.lua`.
+- Reproduces with the standalone config in `init.lua`.
+- Does not require `lazy.nvim`.
+- Does not require `tree-sitter-manager.nvim`.
 - Does not require `haskell-tools.nvim` or HLS.
 - Does not require `rainbow-delimiters.nvim`.
 - The minimized trigger is in `Main.hs`.
@@ -32,10 +34,17 @@ Observed during reduction:
 
 The standalone config uses only:
 
-- `lazy.nvim`
-- `romus204/tree-sitter-manager.nvim`
-- Haskell parser installation
+- the `tree-sitter-haskell` parser submodule
+- local Haskell query files under `queries/haskell/`
 - `vim.treesitter.start()` for Haskell buffers
+
+If this repository was cloned without submodules, initialize the parser first:
+
+```sh
+git submodule update --init --recursive
+```
+
+`setup.sh` builds the parser with `tree-sitter build`. This matters: building the same parser revision through the grammar's Makefile did not reproduce the crash in testing, while `tree-sitter build` did.
 
 Run from this directory:
 
@@ -50,11 +59,11 @@ Equivalent full command:
 root=$(CDPATH= cd -- "$(dirname -- "./repro.sh")" && pwd)
 
 env \
-  XDG_CONFIG_HOME="$root/nvim-repro" \
-  XDG_DATA_HOME="$root/nvim-repro/data" \
-  XDG_STATE_HOME="$root/nvim-repro/state" \
-  XDG_CACHE_HOME="$root/nvim-repro/cache" \
-  nvim -u "$root/nvim-repro/init.lua" "$root/Main.hs"
+  XDG_CONFIG_HOME="$root/xdg/config" \
+  XDG_DATA_HOME="$root/xdg/data" \
+  XDG_STATE_HOME="$root/xdg/state" \
+  XDG_CACHE_HOME="$root/xdg/cache" \
+  nvim --clean -u "$root/init.lua" "$root/Main.hs"
 ```
 
 ## Likely Cause
@@ -64,8 +73,13 @@ This points to a native Neovim/tree-sitter issue rather than a dotfiles issue.
 Most likely candidates:
 
 - Neovim's built-in tree-sitter highlighter corrupting memory for this Haskell file/query case.
-- The compiled Haskell tree-sitter parser corrupting memory while parsing `Main.hs`.
 - An interaction between the Haskell parser, Haskell highlight queries, and Neovim's highlighter.
+
+Additional isolation findings:
+
+- Creating/parsing with the parser without starting the highlighter was stable once plugin auto-highlighting was disabled.
+- Emptying both `highlights` and `injections` queries was stable.
+- The parser shared object must be built with `tree-sitter build` to reproduce this crash here.
 
 ## Next Steps
 
